@@ -1,7 +1,7 @@
 version: '3'
 
 services:
-  # 1. 数据库：存储 DNS 记录和面板数据
+  # 1. 数据库：一个库供给面板和 DNS 引擎共同使用
   db:
     image: mariadb:10.11
     environment:
@@ -13,12 +13,12 @@ services:
       - pdns-db-data:/var/lib/mysql
     restart: always
 
-  # 2. PowerDNS 权威服务器 (使用预编译镜像，绕过编译错误)
+  # 2. PowerDNS 权威服务器：使用预编译镜像，告别 Dockerfile 编译错误
   auth:
     image: psitrax/powerdns:latest
     environment:
       - PDNS_CONF_API=yes
-      - PDNS_CONF_API_KEY=pda_api_key_123
+      - PDNS_CONF_API_KEY=pda_api_key_123  # 一会儿在网页里填这个
       - PDNS_CONF_WEBSERVER=yes
       - PDNS_CONF_WEBSERVER_ADDRESS=0.0.0.0
       - PDNS_CONF_WEBSERVER_ALLOW_FROM=0.0.0.0/0
@@ -39,7 +39,7 @@ services:
     image: powerdnsadmin/pda-legacy:latest
     environment:
       - SQLALCHEMY_DATABASE_URI=mysql://pdns:pdns_password@db/pdns
-      - SECRET_KEY=这里随便填一串随机字符
+      - SECRET_KEY=这里随便填一串随机字母
     ports:
       - "80"
     depends_on:
