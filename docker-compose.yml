@@ -1,39 +1,47 @@
----
-version: '2.0'
+version: '3'
+
 services:
-  recursor:
-    build:
-      context: .
-      dockerfile: Dockerfile-recursor
+  # 1. 数据库 (必须添加，原 YAML 假设你本地有库，Coolify 里需要自建)
+  db:
+    image: mariadb:10.11
     environment:
-      - PDNS_RECURSOR_API_KEY
-    ports:
-      - "2053:53"
-      - "2053:53/udp"
-      - "8082:8082"
+      - MYSQL_ROOT_PASSWORD=root_pass
+      - MYSQL_DATABASE=pdns
+      - MYSQL_USER=pdns
+      - MYSQL_PASSWORD=pdns_password
+    volumes:
+      - pdns-db-data:/var/lib/mysql
 
-  dnsdist:
-    build:
-      context: .
-      dockerfile: Dockerfile-dnsdist
-    environment:
-      - DNSDIST_API_KEY
-    links:
-      - recursor
-      - auth
-    ports:
-      - "3053:53"
-      - "3053:53/udp"
-      - "5199:5199"
-      - "8083:8083"
-
+  # 2. 权威服务器 (对应你原本的 auth)
   auth:
     build:
       context: .
       dockerfile: Dockerfile-auth
     environment:
-      - PDNS_AUTH_API_KEY
+      - PDNS_AUTH_API_KEY=pda_api_key_123
+      # 告诉 Auth 连接上面的数据库
+      - PDNS_GMYSQL_HOST=db
+      - PDNS_GMYSQL_DB=pdns
+      - PDNS_GMYSQL_USER=pdns
+      - PDNS_GMYSQL_PASSWORD=pdns_password
     ports:
-      - "1053:53"
-      - "1053:53/udp"
+      - "53:53/udp"
+      - "53:53"
       - "8081:8081"
+    depends_on:
+      - db
+
+  # 3. PowerDNS-Admin 面板
+  app:
+    image: powerdnsadmin/pda-legacy:latest
+    environment:
+      - SQLALCHEMY_DATABASE_URI=mysql://pdns:pdns_password@db/pdns
+      - SECRET_KEY=换成随机字符串
+    ports:
+      - "80"
+    depends_on:
+      - auth
+      - db
+
+volumes:
+  pdns-db-data:
