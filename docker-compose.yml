@@ -1,47 +1,51 @@
 version: '3'
 
 services:
-  # 1. 数据库 (必须添加，原 YAML 假设你本地有库，Coolify 里需要自建)
+  # 1. 数据库：存储 DNS 记录和面板数据
   db:
     image: mariadb:10.11
     environment:
-      - MYSQL_ROOT_PASSWORD=root_pass
+      - MYSQL_ROOT_PASSWORD=pdns_root_pwd
       - MYSQL_DATABASE=pdns
       - MYSQL_USER=pdns
       - MYSQL_PASSWORD=pdns_password
     volumes:
       - pdns-db-data:/var/lib/mysql
+    restart: always
 
-  # 2. 权威服务器 (对应你原本的 auth)
+  # 2. PowerDNS 权威服务器 (使用预编译镜像，绕过编译错误)
   auth:
-    build:
-      context: .
-      dockerfile: Dockerfile-auth
+    image: psitrax/powerdns:latest
     environment:
-      - PDNS_AUTH_API_KEY=pda_api_key_123
-      # 告诉 Auth 连接上面的数据库
-      - PDNS_GMYSQL_HOST=db
-      - PDNS_GMYSQL_DB=pdns
-      - PDNS_GMYSQL_USER=pdns
-      - PDNS_GMYSQL_PASSWORD=pdns_password
+      - PDNS_CONF_API=yes
+      - PDNS_CONF_API_KEY=pda_api_key_123
+      - PDNS_CONF_WEBSERVER=yes
+      - PDNS_CONF_WEBSERVER_ADDRESS=0.0.0.0
+      - PDNS_CONF_WEBSERVER_ALLOW_FROM=0.0.0.0/0
+      - PDNS_CONF_GMYSQL_HOST=db
+      - PDNS_CONF_GMYSQL_DB=pdns
+      - PDNS_CONF_GMYSQL_USER=pdns
+      - PDNS_CONF_GMYSQL_PASSWORD=pdns_password
     ports:
       - "53:53/udp"
-      - "53:53"
+      - "53:53/tcp"
       - "8081:8081"
     depends_on:
       - db
+    restart: always
 
-  # 3. PowerDNS-Admin 面板
+  # 3. PowerDNS-Admin 管理面板
   app:
     image: powerdnsadmin/pda-legacy:latest
     environment:
       - SQLALCHEMY_DATABASE_URI=mysql://pdns:pdns_password@db/pdns
-      - SECRET_KEY=换成随机字符串
+      - SECRET_KEY=这里随便填一串随机字符
     ports:
       - "80"
     depends_on:
-      - auth
       - db
+      - auth
+    restart: always
 
 volumes:
   pdns-db-data:
